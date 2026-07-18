@@ -205,6 +205,11 @@
   }
   .submit:active{ transform:scale(.98); }
   .submit:disabled{ opacity:.4; }
+  .credit{
+    position:fixed; right:8px; top:calc(4px + env(safe-area-inset-top));
+    font-size:10px; color:var(--ink-dim); opacity:.85;
+    z-index:6; pointer-events:none; letter-spacing:.02em;
+  }
 
   /* ---- overlays (start screen & results) ---- */
   .overlay{
@@ -277,6 +282,7 @@
 <body>
 
 <div class="hurry-overlay" id="hurryOverlay"></div>
+<div class="credit">Produced by Shimofuri</div>
 <div class="stage">
   <div class="topbar">
     <button class="mute-btn" id="muteBtn">🔊</button>
