@@ -18,6 +18,9 @@
     --teal:#2ec4b6;
     --teal-deep:#20948a;
     --red:#ff6b6b;
+    --red-deep:#e14a4a;
+    --purple:#a78bfa;
+    --purple-deep:#8767e8;
     --ink:#f5f3ff;
     --ink-dim:#9c9bc7;
   }
@@ -53,14 +56,17 @@
     display:flex; align-items:center; justify-content:space-between;
     gap:8px;
   }
-  .mute-btn{
+  .icon-group{ display:flex; gap:6px; flex:0 0 auto; }
+  .icon-btn{
     width:34px; height:34px; border-radius:50%;
     background:var(--panel); border:1px solid var(--panel-edge);
     color:var(--ink); font-size:15px;
     display:flex; align-items:center; justify-content:center;
     flex:0 0 auto;
   }
-  .mute-btn:active{ transform:scale(.92); }
+  .icon-btn:active{ transform:scale(.92); }
+  .icon-btn.gameplay-only{ display:none; }
+  .icon-group.playing .icon-btn.gameplay-only{ display:flex; }
   .diff-chip{
     font-size:12px; font-weight:800; letter-spacing:.04em;
     padding:6px 20px; border-radius:999px;
@@ -169,6 +175,17 @@
   }
   .feedback.good{ color:var(--gold); }
   .feedback.bad{ color:var(--red); }
+  .continue-btn{
+    display:none;
+    margin:10px auto 0;
+    border:none; border-radius:14px;
+    padding:10px 30px;
+    font-size:14px; font-weight:800; font-family: ui-rounded, -apple-system, sans-serif;
+    background:linear-gradient(135deg, var(--gold), var(--gold-deep));
+    color:#3a2600;
+    box-shadow:0 8px 18px rgba(0,0,0,.25);
+  }
+  .continue-btn:active{ transform:scale(.96); }
   .keypad{
     width:100%; max-width:520px;
     display:grid;
@@ -194,7 +211,7 @@
     width:100%; max-width:520px;
     flex:0 0 auto;
     border:none; border-radius:16px;
-    padding:12px;
+    padding:24px 12px;
     font-size:16px; font-weight:800;
     font-family: ui-rounded, -apple-system, sans-serif;
     letter-spacing:.02em;
@@ -270,6 +287,8 @@
   }
   .action-btn.primary{ background:linear-gradient(135deg, var(--gold), var(--gold-deep)); color:#3a2600; }
   .action-btn.secondary{ background:linear-gradient(135deg, var(--teal), var(--teal-deep)); color:#08211f; }
+  .action-btn.tertiary{ background:linear-gradient(135deg, var(--red), var(--red-deep)); color:#3a0e0e; }
+  .action-btn.quaternary{ background:linear-gradient(135deg, var(--purple), var(--purple-deep)); color:#221041; }
   .action-btn.ghost{ background:transparent; color:var(--ink-dim); border:1px solid var(--panel-edge); box-shadow:none; }
   .action-btn:active{ transform:scale(.97); }
   .confetti{
@@ -285,7 +304,11 @@
 <div class="credit">Produced by Shimofuri</div>
 <div class="stage">
   <div class="topbar">
-    <button class="mute-btn" id="muteBtn">🔊</button>
+    <div class="icon-group" id="iconGroup">
+      <button class="icon-btn" id="muteBtn">🔊</button>
+      <button class="icon-btn gameplay-only" id="pauseBtn" aria-label="一時停止">⏸️</button>
+      <button class="icon-btn gameplay-only" id="exitBtn" aria-label="終了">✕</button>
+    </div>
     <div class="diff-chip" id="diffChip">きゅう みせんたく</div>
     <div class="score" id="score">0/0</div>
   </div>
@@ -298,6 +321,7 @@
   <div class="card" id="card">
     <div class="equation" id="equation"></div>
     <div class="feedback" id="feedback">すうじを えらんで こたえよう</div>
+    <button class="continue-btn" id="continueBtn">つづける</button>
   </div>
 
   <div class="keypad" id="keypad">
@@ -312,7 +336,7 @@
     <button class="key" data-k="3">3</button>
     <button class="key func" data-k="clear">けす</button>
     <button class="key" data-k="0">0</button>
-    <button class="key func" data-k="back">⌫</button>
+    <button class="key func" data-k="back">もどる</button>
   </div>
 
   <button class="submit" id="submit">こたえる</button>
@@ -346,6 +370,25 @@
   <div class="btn-row" id="resultBtns"></div>
 </div>
 
+<!-- pause screen -->
+<div class="overlay" id="pauseScreen">
+  <h1>⏸️ いちじ ていし</h1>
+  <div class="btn-row">
+    <button class="action-btn primary" id="resumeBtn">さいかい する</button>
+    <button class="action-btn ghost" id="pauseExitBtn">きゅうを えらびなおす</button>
+  </div>
+</div>
+
+<!-- exit confirm screen -->
+<div class="overlay" id="exitConfirmScreen">
+  <h1>おわりますか？</h1>
+  <p class="sub">ここまでの きろくは きえます</p>
+  <div class="btn-row">
+    <button class="action-btn secondary" id="exitConfirmYes">さいしょの がめんに もどる</button>
+    <button class="action-btn quaternary" id="exitConfirmNo">終了する</button>
+  </div>
+</div>
+
 <script>
 (function(){
   const LEVELS = [
@@ -370,7 +413,7 @@
   let pipStatus = [];
   let correctInRun = 0, totalInRun = 0;
   let nums = [], answer = 0, userInput = "";
-  let locked = false, running = false;
+  let locked = false, running = false, paused = false;
 
   const fuseEl = document.getElementById('fuse');
   const levelTagEl = document.getElementById('levelTag');
@@ -378,6 +421,7 @@
   const equationEl = document.getElementById('equation');
   const feedbackEl = document.getElementById('feedback');
   const cardEl = document.getElementById('card');
+  const continueBtnEl = document.getElementById('continueBtn');
   const scoreEl = document.getElementById('score');
   const diffChipEl = document.getElementById('diffChip');
   const submitEl = document.getElementById('submit');
@@ -390,6 +434,15 @@
   const resultBtnsEl = document.getElementById('resultBtns');
   const muteBtn = document.getElementById('muteBtn');
   const hurryOverlayEl = document.getElementById('hurryOverlay');
+  const iconGroupEl = document.getElementById('iconGroup');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const exitBtn = document.getElementById('exitBtn');
+  const pauseScreenEl = document.getElementById('pauseScreen');
+  const resumeBtn = document.getElementById('resumeBtn');
+  const pauseExitBtn = document.getElementById('pauseExitBtn');
+  const exitConfirmScreenEl = document.getElementById('exitConfirmScreen');
+  const exitConfirmYes = document.getElementById('exitConfirmYes');
+  const exitConfirmNo = document.getElementById('exitConfirmNo');
 
   /* ---------------- audio ---------------- */
   let audioCtx = null, sfxGain = null;
@@ -504,6 +557,23 @@
     else if(!musicOn && bgmTimer){ clearTimeout(bgmTimer); bgmTimer = null; }
   });
 
+  // 画面が非表示になったら(タブ切り替え/アプリのバックグラウンド化)音を止め、
+  // 復帰したら再開する。Androidラッパー側からも window.__appPauseAudio/__appResumeAudio を呼べる。
+  function pauseAllAudio(){
+    if(bgmTimer){ clearTimeout(bgmTimer); bgmTimer = null; }
+    if(audioCtx && audioCtx.state === 'running'){ audioCtx.suspend(); }
+  }
+  function resumeAllAudio(){
+    if(!audioCtx) return;
+    if(audioCtx.state === 'suspended'){ audioCtx.resume(); }
+    if(musicOn && !bgmTimer){ playMelodyLoop(); }
+  }
+  window.__appPauseAudio = pauseAllAudio;
+  window.__appResumeAudio = resumeAllAudio;
+  document.addEventListener('visibilitychange', () => {
+    if(document.hidden){ pauseAllAudio(); } else { resumeAllAudio(); }
+  });
+
   /* ---------------- helpers ---------------- */
   function shuffle(arr){
     const a = arr.slice();
@@ -517,11 +587,11 @@
 
   const HURRY_START_MS = 6000;
   const HURRY_MAX_MS = 18000;
-  let hurryInterval = null, questionStartTime = 0;
+  let hurryInterval = null, questionStartTime = 0, pauseElapsedMs = 0;
 
-  function startHurryTimer(){
+  function startHurryTimer(keepElapsed){
     clearHurryTimer();
-    questionStartTime = Date.now();
+    if(!keepElapsed) questionStartTime = Date.now();
     hurryInterval = setInterval(()=>{
       const elapsed = Date.now() - questionStartTime;
       const t = Math.min(Math.max((elapsed - HURRY_START_MS) / (HURRY_MAX_MS - HURRY_START_MS), 0), 1);
@@ -565,6 +635,7 @@
     questionInLevel = 0;
     correctInRun = 0; totalInRun = 0;
     running = true;
+    paused = false;
     diffChipEl.textContent = diff.label;
     diffChipEl.className = 'diff-chip n-' + diff.key;
     scoreEl.textContent = "0/0";
@@ -572,7 +643,42 @@
     updateLevelTag();
     startScreenEl.classList.remove('show');
     resultScreenEl.classList.remove('show');
+    pauseScreenEl.classList.remove('show');
+    exitConfirmScreenEl.classList.remove('show');
+    iconGroupEl.classList.add('playing');
     newQuestion();
+  }
+
+  function exitToSelect(){
+    running = false;
+    paused = false;
+    clearHurryTimer();
+    iconGroupEl.classList.remove('playing');
+    pauseScreenEl.classList.remove('show');
+    exitConfirmScreenEl.classList.remove('show');
+    resultScreenEl.classList.remove('show');
+    startScreenEl.classList.add('show');
+    if(bgmGain) bgmGain.gain.value = 0.11;
+    resumeAllAudio();
+  }
+
+  function pauseGame(){
+    if(!running || paused || locked) return;
+    paused = true;
+    pauseElapsedMs = Date.now() - questionStartTime;
+    clearHurryTimer();
+    pauseAllAudio();
+    pauseScreenEl.classList.add('show');
+  }
+
+  function resumeGame(){
+    if(!running || !paused) return;
+    paused = false;
+    pauseScreenEl.classList.remove('show');
+    exitConfirmScreenEl.classList.remove('show');
+    resumeAllAudio();
+    questionStartTime = Date.now() - pauseElapsedMs;
+    startHurryTimer(true);
   }
 
   function newQuestion(){
@@ -584,6 +690,8 @@
     renderEquation();
     feedbackEl.textContent = "すうじを えらんで こたえよう";
     feedbackEl.className = "feedback";
+    continueBtnEl.style.display = 'none';
+    continueBtnEl.onclick = null;
     locked = false;
     startHurryTimer();
   }
@@ -617,7 +725,7 @@
   }
 
   function pressKey(k){
-    if(locked || !running) return;
+    if(locked || !running || paused) return;
     if(k === 'clear'){ userInput = ""; }
     else if(k === 'back'){ userInput = userInput.slice(0, -1); }
     else { if(userInput.length < 3) userInput += k; }
@@ -673,6 +781,7 @@
 
   function showResults(){
     running = false;
+    iconGroupEl.classList.remove('playing');
     clearHurryTimer();
     const pct = totalInRun > 0 ? Math.round((correctInRun/totalInRun)*100) : 0;
     resultScoreEl.textContent = `${correctInRun} / ${totalInRun}（${pct}%）`;
@@ -713,17 +822,27 @@
     }
 
     resultBtnsEl.appendChild(makeBtn(`もう一度 ${diff.label}`, 'secondary', ()=> startDifficulty(diff.key)));
-    resultBtnsEl.appendChild(makeBtn('きゅうを えらびなおす', 'ghost', ()=> {
+    resultBtnsEl.appendChild(makeBtn('きゅうを えらびなおす', 'tertiary', ()=> {
       resultScreenEl.classList.remove('show');
       startScreenEl.classList.add('show');
       if(bgmGain) bgmGain.gain.value = 0.11;
     }));
+    resultBtnsEl.appendChild(makeBtn('終了する', 'quaternary', exitApp));
 
     resultScreenEl.classList.add('show');
   }
 
+  function exitApp(){
+    if(window.AndroidApp && window.AndroidApp.exit){
+      window.AndroidApp.exit();
+      return;
+    }
+    // ブラウザ版では自動でタブを閉じられないため、きゅう選択に戻す
+    exitToSelect();
+  }
+
   function submitAnswer(){
-    if(locked || !running) return;
+    if(locked || !running || paused) return;
     if(userInput === "") return;
     locked = true;
     clearHurryTimer();
@@ -757,14 +876,29 @@
         levelTagEl.classList.remove('pulse'); void levelTagEl.offsetWidth; levelTagEl.classList.add('pulse');
         showLevelUp(`つぎの れべるへ！<br>「${LEVELS[currentLevelIndex].label}」`);
         sfxLevelUp();
-        setTimeout(newQuestion, 1200);
+        proceed(newQuestion, 1200, isCorrect);
       } else {
-        setTimeout(showResults, 900);
+        proceed(showResults, 900, isCorrect);
       }
     } else {
       updateLevelTag();
-      setTimeout(newQuestion, 1100);
+      proceed(newQuestion, 1100, isCorrect);
     }
+  }
+
+  // 正解時はこれまで通り自動で次へ進む。不正解時は「つづける」ボタンを
+  // 押すまで正解を表示したままにする。
+  function proceed(nextFn, delay, isCorrect){
+    if(isCorrect){
+      setTimeout(nextFn, delay);
+      return;
+    }
+    continueBtnEl.style.display = 'inline-block';
+    continueBtnEl.onclick = () => {
+      continueBtnEl.style.display = 'none';
+      continueBtnEl.onclick = null;
+      nextFn();
+    };
   }
 
   document.getElementById('keypad').addEventListener('click', (e)=>{
@@ -776,6 +910,19 @@
   startScreenEl.querySelectorAll('.choice-card').forEach(btn=>{
     btn.addEventListener('click', ()=> startDifficulty(btn.dataset.diff));
   });
+
+  pauseBtn.addEventListener('click', pauseGame);
+  resumeBtn.addEventListener('click', resumeGame);
+  pauseExitBtn.addEventListener('click', exitToSelect);
+
+  exitBtn.addEventListener('click', ()=>{
+    if(!running) return;
+    if(!paused) pauseGame();
+    pauseScreenEl.classList.remove('show');
+    exitConfirmScreenEl.classList.add('show');
+  });
+  exitConfirmYes.addEventListener('click', exitToSelect);
+  exitConfirmNo.addEventListener('click', exitApp);
 })();
 </script>
 
